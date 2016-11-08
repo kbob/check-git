@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+
+import os
+import re
+import subprocess
+
+IGNORE_PATHS = [
+    '.cargo/',
+    '.multirust/',
+]
+
+def repo_is_ignored(repo):
+    for path in IGNORE_PATHS:
+        if repo.startswith(path):
+            return True
+
+def do_git(command, repo):
+    command = ['git'] + command
+    output = subprocess.check_output(command, cwd=repo)
+    output = output.decode('utf-8')
+    return output
+
+def check_branch(status):
+    m = re.search(r'On branch (.*)', status)
+    if m:
+        return m.group(1) != 'master' and m.group(0)
+    m = re.search(r'HEAD detached .*', status)
+    assert m, "can't find branch in {!r}".format(status)
+    return m.group(0)
+
+def check_ahead(status):
+    m = re.search(r'Your branch is ahead of .*', status)
+    if m:
+        return m.group(0)
+
+def check_changes(status, repo):
+    if 'nothing to commit' not in status:
+        return do_git(['status', '-s'], repo).rstrip()
+
+
+def print_indented(string, prefix='  '):
+    print(re.sub(r'^', prefix, string, flags=re.MULTILINE))
+
+
+def check_git():
+
+    clean = []
+    branched = {}
+    local_only = []
+
+    for (dirpath, dirnames, filenames) in os.walk('.'):
+        # print('path:', dirpath)
+        if '.git' not in dirnames:
+            continue
+        repo = dirpath
+        if dirpath.startswith('./'):
+            repo = dirpath[2:]
+
+        if repo_is_ignored(repo):
+            continue
+
+        status = do_git(['status'], repo)
+
+        branch = check_branch(status)
+        ahead = check_ahead(status)
+        changes = check_changes(status, repo)
+        remotes = do_git(['remote'], repo)
+        stashes = do_git(['stash', 'list'], repo)
+
+        if ahead or changes or stashes:
+            print(repo)
+            if branch:
+                print_indented(branch)
+            if ahead:
+                print_indented(ahead)
+            if changes:
+                print_indented(changes)
+            if stashes:
+                print_indented(stashes)
+            print()
+        elif branch:
+            branched[repo] = branch.replace('On branch ', '')
+        else:
+            clean.append(repo)
+
+        if not remotes:
+            local_only.append(repo)
+
+    if local_only:
+        print('Repositories without Remotes')
+        for repo in sorted(local_only):
+            print_indented(repo)
+        print()
+
+    if branched:
+        print('Branched Repositories')
+        bwid = max(len(b) for b in branched.values())
+        for repo in sorted(branched):
+            print_indented('{:>{w}} {}'.format(branched[repo], repo, w=bwid))
+        print()
+
+    if clean:
+        print('Clean Repositories:')
+        for repo in sorted(clean):
+            print_indented(repo)
+
+
+if __name__ == '__main__':
+    check_git()
