@@ -1,7 +1,7 @@
 # check-git
 
-`check-git` is a command line tool.  It scans your home directory for
-git repositories that are dirty.  It looks for five things:
+`check-git` is a command line tool.  It scans the current directory
+for git repositories that are dirty.  It looks for five things:
 
 * Repositories with changed or untracked files
 
@@ -19,6 +19,8 @@ are just noted.
 `check-git` prints a summary of every dirty repository, then it lists
 remoteless repos, branched repos, and clean repos.
 
+`check-git --summary` just prints the number of repositories in each
+category.
 
 ## Example
 
@@ -57,11 +59,22 @@ remoteless repos, branched repos, and clean repos.
       Documents/Code/Scheme/Lisp-In-Small-Pieces
       Documents/Code/Scheme/elco
       Documents/Code/github/1Bitsy/1bitsy-hardware
+    
+    ------
+    Summary
+      6 clean repositories
+        0 branched
+        0 remoteless
+      2 dirty repositories
+        2 branched
+        1 remoteless
+      ------
+      8 total repositories
 
 
 
 ## Rust
 
-There is special code to ignore repositories in `~/.cargo` and
-`~/.multirust` since the Rust runtime creates dirty repositories there
+There is special code to ignore repositories in `.cargo` and
+`.multirust` since the Rust tools create dirty repositories there
 without user intervention.

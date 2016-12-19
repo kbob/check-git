@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import re
 import subprocess
+import sys
 
 IGNORE_PATHS = [
     '.cargo/',
@@ -42,9 +44,10 @@ def print_indented(string, prefix='  '):
     print(re.sub(r'^', prefix, string, flags=re.MULTILINE))
 
 
-def check_git():
+def check_git(print_stats=True, print_lists=True, print_repos=True):
 
     clean = []
+    dirty = []
     branched = {}
     local_only = []
 
@@ -68,42 +71,94 @@ def check_git():
         stashes = do_git(['stash', 'list'], repo)
 
         if ahead or changes or stashes:
-            print(repo)
-            if branch:
-                print_indented(branch)
-            if ahead:
-                print_indented(ahead)
-            if changes:
-                print_indented(changes)
-            if stashes:
-                print_indented(stashes)
-            print()
-        elif branch:
-            branched[repo] = branch.replace('On branch ', '')
+            dirty.append(repo)
+            if print_repos:
+                print(repo)
+                if branch:
+                    print_indented(branch)
+                if ahead:
+                    print_indented(ahead)
+                if changes:
+                    print_indented(changes)
+                if stashes:
+                    print_indented(stashes)
+                print()
         else:
             clean.append(repo)
+
+        if branch:
+            branched[repo] = branch.replace('On branch ', '')
 
         if not remotes:
             local_only.append(repo)
 
-    if local_only:
-        print('Repositories without Remotes')
-        for repo in sorted(local_only):
-            print_indented(repo)
+    if print_repos and (print_lists or print_stats):
+        print()
+        print('------')
+
+    if print_lists:
+        if local_only:
+            print('Repositories without Remotes')
+            for repo in sorted(local_only):
+                print_indented(repo)
+            print()
+
+        if branched:
+            print('Branched Repositories')
+            bwid = max(len(b) for b in branched.values())
+            for repo in sorted(branched):
+                print_indented('{:>{w}} {}'.format(branched[repo], repo, w=bwid))
+            print()
+
+        if clean:
+            print('Clean Repositories:')
+            for repo in sorted(clean):
+                print_indented(repo)
+
+        if print_stats:
+            print()
+            print('------')
+
+    if print_stats:
+        nc = len(clean)
+        ncb = len([r for r in clean if r in branched])
+        ncr = len([r for r in clean if r in local_only])
+        nd = len(dirty)
+        ndb = len([r for r in dirty if r in branched])
+        ndr = len([r for r in dirty if r in local_only])
+        nt = nc + nd
+        w0 = len(str(max((nc, nd, nt))))
+        w1 = len(str(max(ncb, ncr, ndb, ndr)))
+        def repo_plural(n):
+            return ('repositories', 'repository')[n == 1]
+        # There is probably an easier way to align columns.
+        print('Summary')
+        print('  {0:{1}} clean {2}'.format(nc, w0, repo_plural(nc)))
+        print('   {0:{1}} branched'.format(ncb, w0 + w1))
+        print('   {0:{1}} remoteless'.format(ncr, w0 + w1))
+        print('  {0:{1}} dirty {2}'.format(nd, w0, repo_plural(nd)))
+        print('   {0:{1}} branched'.format(ndb, w0 + w1))
+        print('   {0:{1}} remoteless'.format(ndr, w0 + w1))
+        print('  ------')
+        print('  {0:{1}} total {2}'.format(nt, w0, repo_plural(nt)))
         print()
 
-    if branched:
-        print('Branched Repositories')
-        bwid = max(len(b) for b in branched.values())
-        for repo in sorted(branched):
-            print_indented('{:>{w}} {}'.format(branched[repo], repo, w=bwid))
-        print()
 
-    if clean:
-        print('Clean Repositories:')
-        for repo in sorted(clean):
-            print_indented(repo)
-
+def main(argv):
+    d = 'Check git repos for unfinished work.'
+    parser = argparse.ArgumentParser(description=d)
+    parser.add_argument('-s', '--summary',
+                        action='store_const', const=True,
+                        help='show summary only')
+    args = parser.parse_args(sys.argv[1:])
+    # print(args)
+    # exit()
+    print_repos = not args.summary
+    print_lists = not args.summary
+    print_stats = True
+    check_git(print_repos=print_repos,
+              print_lists=print_lists,
+              print_stats=print_stats)
 
 if __name__ == '__main__':
-    check_git()
+    main(sys.argv)
