@@ -9,6 +9,7 @@ import sys
 IGNORE_PATHS = [
     '.cargo/',
     '.multirust/',
+    '.rustup/',
 ]
 
 def repo_is_ignored(repo):
